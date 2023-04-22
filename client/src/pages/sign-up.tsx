@@ -1,13 +1,18 @@
 import React from 'react'
 import { NextPage } from 'next'
+import toast from 'react-hot-toast'
 import { MdEmail } from 'react-icons/md'
 import { PulseLoader } from 'react-spinners'
 import { RiLockPasswordFill } from 'react-icons/ri'
+import { useMutation } from '@tanstack/react-query'
 import { yupResolver } from '@hookform/resolvers/yup'
 import { SubmitHandler, useForm } from 'react-hook-form'
 
+import useStore from '~/store'
 import Card from '~/components/atoms/Card'
 import Label from '~/components/atoms/Label'
+import { signUpUserFn } from './api/authApi'
+import { RegisterInput } from '~/utils/types'
 import Button from '~/components/atoms/Button'
 import { SignUpSchema } from '~/utils/validation'
 import Layout from '~/components/templates/Layout'
@@ -15,6 +20,30 @@ import { SignUpFormValues } from '~/utils/formValues'
 import FormInput from '~/components/molecules/FormInput'
 
 const SignUp: NextPage = (): JSX.Element => {
+  const store = useStore()
+
+  const {
+    mutate: registerUser,
+    data,
+    isSuccess
+  } = useMutation((userData: RegisterInput) => signUpUserFn(userData), {
+    onMutate(variables) {
+      store.setRequestLoading(true)
+    },
+    onSuccess(data) {
+      store.setRequestLoading(false)
+      toast.success(data?.message)
+    },
+    onError(error: any) {
+      store.setRequestLoading(false)
+      if (Array.isArray((error as any).response.data.error)) {
+        ;(error as any).response.data.error.forEach((el: any) => toast.error(el.message))
+      } else {
+        toast.error((error as any).response.data.message)
+      }
+    }
+  })
+
   const {
     reset,
     register,
@@ -27,11 +56,9 @@ const SignUp: NextPage = (): JSX.Element => {
 
   const handleSignUp: SubmitHandler<SignUpFormValues> = async (data): Promise<void> => {
     return await new Promise((resolve) => {
-      setTimeout(() => {
-        console.log(data)
-        resolve()
-        handleReset()
-      }, 2000)
+      registerUser({ user: data })
+      resolve()
+      handleReset()
     })
   }
 
@@ -58,7 +85,7 @@ const SignUp: NextPage = (): JSX.Element => {
                 register={register('email')}
                 placeholder="name@gmail.com"
                 isError={errors?.email}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSuccess}
               />
               {errors?.email && <span className="error">{errors.email?.message}</span>}
             </section>
@@ -70,7 +97,7 @@ const SignUp: NextPage = (): JSX.Element => {
                 register={register('password')}
                 placeholder="••••••••••"
                 isError={errors?.password}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSuccess}
               />
               {errors?.password && <span className="error">{errors.password?.message}</span>}
             </section>
@@ -82,15 +109,20 @@ const SignUp: NextPage = (): JSX.Element => {
                 Icon={RiLockPasswordFill}
                 placeholder="••••••••••"
                 isError={errors?.password_confirmation}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isSuccess}
               />
               {errors?.password_confirmation && (
                 <span className="error">{errors.password_confirmation?.message}</span>
               )}
             </section>
             <footer>
-              <Button type="submit" variant="blue" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? (
+              <Button
+                type="submit"
+                variant="blue"
+                className="w-full"
+                disabled={isSubmitting || isSuccess}
+              >
+                {isSubmitting || isSuccess ? (
                   <div className="flex items-center justify-center py-0.5">
                     <PulseLoader color="#ffffff" size={10} />
                   </div>
